@@ -63,7 +63,7 @@ for more details.
    ratio(s) and mutation score (see Question 4 below).
 
 5. Extra credit: **Re-enable the `assertEquals` statement** in the `testTriangle` method and
-   **set `exportKillMap` to true** in the `build.xml` file.
+   **set `exportKillMap` to true** in the `mutation.xml` file.
    **Rerun `mutation.sh`, which now computes `killMap.csv`.**
    Determine the set of dominator mutants (see Question 5 below).
 
@@ -103,12 +103,13 @@ for more details.
 ## Hints
 
 To avoid spurious results and confusion, it is a good idea to **run**
-`ant clean test` to make sure that your added **tests pass** on the original
+`./gradlew clean test` to make sure that your added **tests pass** on the original
 program.
 
-It is possible to write test cases that detect ("kill") every mutant.
-If you are not able to create tests for a few of the mutants, don't
-sweat it.  Turn in what you have.
+It isn't possible (in this case) to write test cases that detect ("kill") every
+mutant.
+If you are not able to create tests for a few of the mutants, don't sweat it.
+Turn in what you have.
 
 
 ## Background
