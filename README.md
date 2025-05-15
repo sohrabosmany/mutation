@@ -42,7 +42,7 @@ provide additional information:
 
     - *killMap.csv*: a matrix that indicates which tests detect (kill) which
                      mutants. (Only computed and exported if `exportKillMap` is
-                     set to true in the `build.xml` build file.)
+                     set to true in the `mutation.xml` build file.)
 
     - *testMap.csv*: a mapping from test id (TestNo) to test name.
 
