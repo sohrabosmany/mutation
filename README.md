@@ -49,7 +49,7 @@ provide additional information:
 ##### Inspecting a mutant
 
 Run `./show_mutant.sh <mutant ID>` to visualize the source code
-differences between a mutant and the original program by running.
+differences between a mutant and the original program.
 
 For example, the following command shows how mutant 1 differs from the original
 (i.e., unmutated) program:
