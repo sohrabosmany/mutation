@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local DMSG Analyzer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #4a5568;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .file-upload {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 2px dashed #667eea;
+        }
+        
+        .upload-section {
+            text-align: center;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .upload-section h3 {
+            margin-top: 0;
+            color: #667eea;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .file-label {
+            display: inline-block;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .file-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        
+        .file-status {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        
+        .file-status.loaded {
+            color: #38a169;
+        }
+        
+        .file-status.error {
+            color: #e53e3e;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            opacity: 0.6;
+        }
+        
+        .results {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 5px solid #667eea;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-top: 4px solid #667eea;
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        #visualization {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        
+        .dominator-list {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .mutant-item {
+            display: inline-block;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 8px 16px;
+            margin: 5px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .error {
+            color: #e53e3e;
+            background: #fed7d7;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 10px;
+            overflow-x: auto;
+            font-size: 14px;
+        }
+        
+        .node {
+            cursor: pointer;
+        }
+        
+        .node:hover {
+            stroke-width: 3px;
+        }
+        
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+            stroke-width: 2px;
+        }
+        
+        .link:hover {
+            stroke-opacity: 1;
+            stroke-width: 3px;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            pointer-events: none;
+            font-size: 12px;
+            z-index: 1000;
+        }
+        
+        .instructions {
+            background: #e6fffa;
+            border: 1px solid #38b2ac;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .instructions h3 {
+            color: #234e52;
+            margin-top: 0;
+        }
+        
+        .step {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧬 Local DMSG Analyzer</h1>
+        
+        <div class="instructions">
+            <h3>📋 Instructions</h3>
+            <div class="step">1. First, generate the killMap.csv by running: <code>./mutation.sh</code> with <code>exportKillMap=true</code> in mutation.xml</div>
+            <div class="step">2. Upload your CSV files using the buttons below</div>
+            <div class="step">3. Follow the analysis workflow step by step</div>
+            <div class="step">4. Explore the interactive visualization and results</div>
+        </div>
+        
+        <div class="file-upload">
+            <div class="upload-section">
+                <h3>📄 Coverage Map</h3>
+                <label for="covMapFile" class="file-label">Choose covMap.csv</label>
+                <input type="file" id="covMapFile" class="file-input" accept=".csv" />
+                <div id="covMapStatus" class="file-status">No file selected</div>
+            </div>
+            <div class="upload-section">
+                <h3>💀 Killed Mutants</h3>
+                <label for="killedFile" class="file-label">Choose killed.csv</label>
+                <input type="file" id="killedFile" class="file-input" accept=".csv" />
+                <div id="killedStatus" class="file-status">No file selected</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="analyzeBtn" onclick="analyzeMutants()" disabled>🔍 Analyze Mutant Data</button>
+            <button id="buildBtn" onclick="buildDMSG()" disabled>🏗️ Build DMSG</button>
+            <button id="visualizeBtn" onclick="visualizeGraph()" disabled>📊 Visualize Graph</button>
+            <button id="dominatorsBtn" onclick="findDominators()" disabled>👑 Find Dominators</button>
+        </div>
+        
+        <div class="stats" id="stats"></div>
+        
+        <div id="results"></div>
+        
+        <div id="visualization"></div>
+        
+        <div id="dominators"></div>
+    </div>
+
+    <script>
+        // Global variables to store our data
+        let covMapData = null;
+        let killedData = null;
+        let mutantTestMatrix = new Map();
+        let testMutantMatrix = new Map();
+        let mutantOutcomes = new Map();
+        let dmsgGraph = { nodes: [], links: [] };
+        let dominatorMutants = new Set();
+
+        // File upload handlers
+        document.getElementById('covMapFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        covMapData = Papa.parse(e.target.result, {
+                            header: true,
+                            dynamicTyping: true,
+                            skipEmptyLines: true
+                        });
+                        document.getElementById('covMapStatus').textContent = `✅ Loaded: ${covMapData.data.length} rows`;
+                        document.getElementById('covMapStatus').className = 'file-status loaded';
+                        checkFilesReady();
+                    } catch (error) {
+                        document.getElementById('covMapStatus').textContent = `❌ Error: ${error.message}`;
+                        document.getElementById('covMapStatus').className = 'file-status error';
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        document.getElementById('killedFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        killedData = Papa.parse(e.target.result, {
+                            header: true,
+                            dynamicTyping: true,
+                            skipEmptyLines: true
+                        });
+                        document.getElementById('killedStatus').textContent = `✅ Loaded: ${killedData.data.length} rows`;
+                        document.getElementById('killedStatus').className = 'file-status loaded';
+                        checkFilesReady();
+                    } catch (error) {
+                        document.getElementById('killedStatus').textContent = `❌ Error: ${error.message}`;
+                        document.getElementById('killedStatus').className = 'file-status error';
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        function checkFilesReady() {
+            if (covMapData && killedData) {
+                document.getElementById('analyzeBtn').disabled = false;
+            }
+        }
+
+        // Utility functions
+        function showLoading(elementId, message = "Processing...") {
+            document.getElementById(elementId).innerHTML = `
+                <div class="loading">
+                    <div style="font-size: 2em;">⏳</div>
+                    <div>${message}</div>
+                </div>
+            `;
+        }
+
+        function showError(elementId, message) {
+            document.getElementById(elementId).innerHTML = `
+                <div class="error">❌ ${message}</div>
+            `;
+        }
+
+        // Step 1: Analyze the mutant data
+        function analyzeMutants() {
+            if (!covMapData || !killedData) {
+                showError('results', 'Please upload both CSV files first!');
+                return;
+            }
+
+            showLoading('results', 'Reading and analyzing mutant data...');
+            
+            try {
+                // Clear previous data
+                mutantTestMatrix.clear();
+                testMutantMatrix.clear();
+                mutantOutcomes.clear();
+
+                // Process killed mutants data
+                const statusColumn = '[FAIL | TIME | EXC | LIVE]';
+                killedData.data.forEach(row => {
+                    const mutantNo = row.MutantNo;
+                    const outcome = row[statusColumn];
+                    mutantOutcomes.set(mutantNo, outcome);
+                });
+
+                // Process coverage data to build kill matrix
+                covMapData.data.forEach(row => {
+                    const testNo = row.TestNo;
+                    const mutantNo = row.MutantNo;
+                    const outcome = mutantOutcomes.get(mutantNo);
+
+                    // Only consider mutants that were actually killed (FAIL)
+                    if (outcome === 'FAIL') {
+                        // Add to mutant -> tests mapping
+                        if (!mutantTestMatrix.has(mutantNo)) {
+                            mutantTestMatrix.set(mutantNo, new Set());
+                        }
+                        mutantTestMatrix.get(mutantNo).add(testNo);
+
+                        // Add to test -> mutants mapping
+                        if (!testMutantMatrix.has(testNo)) {
+                            testMutantMatrix.set(testNo, new Set());
+                        }
+                        testMutantMatrix.get(testNo).add(mutantNo);
+                    }
+                });
+
+                // Display statistics
+                const stats = {
+                    totalMutants: mutantOutcomes.size,
+                    killedMutants: Array.from(mutantOutcomes.values()).filter(v => v === 'FAIL').length,
+                    liveMutants: Array.from(mutantOutcomes.values()).filter(v => v === 'LIVE').length,
+                    totalTests: testMutantMatrix.size,
+                    totalCoverage: covMapData.data.length
+                };
+
+                displayStats(stats);
+
+                document.getElementById('results').innerHTML = `
+                    <div class="results">
+                        <h3>✅ Mutant Analysis Complete</h3>
+                        <p><strong>Data processed successfully!</strong></p>
+                        <p>• Total mutants analyzed: ${stats.totalMutants}</p>
+                        <p>• Mutants killed by tests: ${stats.killedMutants}</p>
+                        <p>• Live mutants (survived): ${stats.liveMutants}</p>
+                        <p>• Active tests: ${stats.totalTests}</p>
+                        <p>• Coverage relationships: ${stats.totalCoverage}</p>
+                        
+                        <h4>Sample Kill Matrix:</h4>
+                        <pre>${generateKillMatrixSample()}</pre>
+                    </div>
+                `;
+
+                document.getElementById('buildBtn').disabled = false;
+
+            } catch (error) {
+                showError('results', `Failed to analyze mutant data: ${error.message}`);
+            }
+        }
+
+        // Generate a sample of the kill matrix for display
+        function generateKillMatrixSample() {
+            let sample = "Mutant | Tests that kill it\n";
+            sample += "-------|------------------\n";
+            
+            let count = 0;
+            for (let [mutant, tests] of mutantTestMatrix) {
+                if (count >= 10) break;
+                sample += `${mutant.toString().padStart(6)} | ${Array.from(tests).sort((a,b) => a-b).join(', ')}\n`;
+                count++;
+            }
+            
+            if (mutantTestMatrix.size > 10) {
+                sample += `... and ${mutantTestMatrix.size - 10} more mutants`;
+            }
+            
+            return sample;
+        }
+
+        // Display statistical information
+        function displayStats(stats) {
+            document.getElementById('stats').innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${stats.totalMutants}</div>
+                    <div class="stat-label">Total Mutants</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stats.killedMutants}</div>
+                    <div class="stat-label">Killed Mutants</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stats.liveMutants}</div>
+                    <div class="stat-label">Live Mutants</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${stats.totalTests}</div>
+                    <div class="stat-label">Active Tests</div>
+                </div>
+            `;
+        }
+
+        // Step 2: Build the Dynamic Mutant Subsumption Graph
+        function buildDMSG() {
+            if (mutantTestMatrix.size === 0) {
+                showError('results', 'Please analyze mutant data first!');
+                return;
+            }
+
+            showLoading('results', 'Building Dynamic Mutant Subsumption Graph...');
+
+            try {
+                // Clear previous graph
+                dmsgGraph = { nodes: [], links: [] };
+
+                // Get all killed mutants
+                const killedMutants = Array.from(mutantTestMatrix.keys());
+                
+                // Create nodes for each mutant
+                killedMutants.forEach(mutant => {
+                    dmsgGraph.nodes.push({
+                        id: mutant,
+                        label: `M${mutant}`,
+                        tests: Array.from(mutantTestMatrix.get(mutant)),
+                        testCount: mutantTestMatrix.get(mutant).size
+                    });
+                });
+
+                // Build subsumption relationships
+                for (let i = 0; i < killedMutants.length; i++) {
+                    for (let j = 0; j < killedMutants.length; j++) {
+                        if (i !== j) {
+                            const mutantA = killedMutants[i];
+                            const mutantB = killedMutants[j];
+                            const testsA = mutantTestMatrix.get(mutantA);
+                            const testsB = mutantTestMatrix.get(mutantB);
+
+                            // Check if testsB ⊆ testsA (B is subsumed by A)
+                            const isSubsumed = Array.from(testsB).every(test => testsA.has(test));
+                            
+                            if (isSubsumed && testsB.size > 0 && testsA.size > testsB.size) {
+                                dmsgGraph.links.push({
+                                    source: mutantA,
+                                    target: mutantB,
+                                    type: 'subsumes'
+                                });
+                            }
+                        }
+                    }
+                }
+
+                document.getElementById('results').innerHTML = `
+                    <div class="results">
+                        <h3>✅ DMSG Construction Complete</h3>
+                        <p><strong>Dynamic Mutant Subsumption Graph built successfully!</strong></p>
+                        <p>• Nodes (mutants): ${dmsgGraph.nodes.length}</p>
+                        <p>• Edges (subsumption relations): ${dmsgGraph.links.length}</p>
+                        
+                        <h4>Graph Structure:</h4>
+                        <p>• Each node represents a killed mutant</p>
+                        <p>• Each directed edge A → B means mutant A subsumes mutant B</p>
+                        <p>• Subsumption: every test that kills B also kills A</p>
+                        
+                        <h4>Sample Subsumption Relations:</h4>
+                        <pre>${generateSubsumptionSample()}</pre>
+                    </div>
+                `;
+
+                document.getElementById('visualizeBtn').disabled = false;
+                document.getElementById('dominatorsBtn').disabled = false;
+
+            } catch (error) {
+                showError('results', `Failed to build DMSG: ${error.message}`);
+            }
+        }
+
+        // Generate sample subsumption relations for display
+        function generateSubsumptionSample() {
+            let sample = "Subsumer → Subsumed | Relationship\n";
+            sample += "--------------------|-----------\n";
+            
+            dmsgGraph.links.slice(0, 10).forEach(link => {
+                const sourceTests = mutantTestMatrix.get(link.source);
+                const targetTests = mutantTestMatrix.get(link.target);
+                sample += `M${link.source} → M${link.target} | Tests(${link.target})[${Array.from(targetTests).sort((a,b) => a-b).join(',')}] ⊆ Tests(${link.source})[${Array.from(sourceTests).sort((a,b) => a-b).join(',')}]\n`;
+            });
+            
+            if (dmsgGraph.links.length > 10) {
+                sample += `... and ${dmsgGraph.links.length - 10} more relations`;
+            }
+            
+            return sample;
+        }
+
+        // Step 3: Visualize the graph
+        function visualizeGraph() {
+            if (dmsgGraph.nodes.length === 0) {
+                showError('visualization', 'Please build DMSG first!');
+                return;
+            }
+
+            // Clear previous visualization
+            document.getElementById('visualization').innerHTML = '';
+
+            const width = 1200;
+            const height = 600;
+
+            const svg = d3.select('#visualization')
+                .append('svg')
+                .attr('width', width)
+                .attr('height', height);
+
+            // Create force simulation
+            const simulation = d3.forceSimulation(dmsgGraph.nodes)
+                .force('link', d3.forceLink(dmsgGraph.links).id(d => d.id).distance(100))
+                .force('charge', d3.forceManyBody().strength(-300))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collision', d3.forceCollide().radius(25));
+
+            // Create arrow markers for directed edges
+            svg.append('defs').selectAll('marker')
+                .data(['subsumes'])
+                .enter().append('marker')
+                .attr('id', d => `arrow-${d}`)
+                .attr('viewBox', '0 -5 10 10')
+                .attr('refX', 20)
+                .attr('refY', 0)
+                .attr('markerWidth', 6)
+                .attr('markerHeight', 6)
+                .attr('orient', 'auto')
+                .append('path')
+                .attr('d', 'M0,-5L10,0L0,5')
+                .attr('fill', '#999');
+
+            // Create links
+            const link = svg.append('g')
+                .selectAll('line')
+                .data(dmsgGraph.links)
+                .enter().append('line')
+                .attr('class', 'link')
+                .attr('marker-end', 'url(#arrow-subsumes)');
+
+            // Create nodes
+            const node = svg.append('g')
+                .selectAll('circle')
+                .data(dmsgGraph.nodes)
+                .enter().append('circle')
+                .attr('class', 'node')
+                .attr('r', d => Math.max(10, Math.min(25, 5 + d.testCount * 2)))
+                .attr('fill', d => d3.interpolateViridis(d.testCount / 10))
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2)
+                .call(d3.drag()
+                    .on('start', dragstarted)
+                    .on('drag', dragged)
+                    .on('end', dragended));
+
+            // Add labels
+            const label = svg.append('g')
+                .selectAll('text')
+                .data(dmsgGraph.nodes)
+                .enter().append('text')
+                .text(d => d.label)
+                .attr('font-size', 12)
+                .attr('font-weight', 'bold')
+                .attr('text-anchor', 'middle')
+                .attr('dy', 4)
+                .attr('fill', '#333');
+
+            // Tooltip
+            const tooltip = d3.select('body').append('div')
+                .attr('class', 'tooltip')
+                .style('opacity', 0);
+
+            node.on('mouseover', function(event, d) {
+                tooltip.transition()
+                    .duration(200)
+                    .style('opacity', .9);
+                tooltip.html(`
+                    <strong>Mutant ${d.id}</strong><br/>
+                    Tests that kill it: ${d.tests.join(', ')}<br/>
+                    Test count: ${d.testCount}
+                `)
+                    .style('left', (event.pageX + 10) + 'px')
+                    .style('top', (event.pageY - 28) + 'px');
+            })
+            .on('mouseout', function(d) {
+                tooltip.transition()
+                    .duration(500)
+                    .style('opacity', 0);
+            });
+
+            // Update positions on simulation tick
+            simulation.on('tick', () => {
+                link.attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+
+                node.attr('cx', d => d.x)
+                    .attr('cy', d => d.y);
+
+                label.attr('x', d => d.x)
+                     .attr('y', d => d.y);
+            });
+
+            // Drag functions
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+
+            function dragended(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+
+            document.getElementById('results').innerHTML = `
+                <div class="results">
+                    <h3>📊 Graph Visualization Complete</h3>
+                    <p><strong>Interactive DMSG visualization created!</strong></p>
+                    <p>• Node size represents the number of tests that kill the mutant</p>
+                    <p>• Node color intensity indicates test coverage</p>
+                    <p>• Arrows show subsumption relationships (A → B means A subsumes B)</p>
+                    <p>• Hover over nodes to see detailed information</p>
+                    <p>• Drag nodes to rearrange the layout</p>
+                </div>
+            `;
+        }
+
+        // Step 4: Find dominator mutants
+        function findDominators() {
+            if (dmsgGraph.nodes.length === 0) {
+                showError('dominators', 'Please build DMSG first!');
+                return;
+            }
+
+            dominatorMutants.clear();
+
+            // Find dominator mutants: those that subsume others but are not subsumed by any
+            const subsumed = new Set();
+            const subsumers = new Set();
+
+            // Collect all subsumption relationships
+            dmsgGraph.links.forEach(link => {
+                subsumers.add(link.source);
+                subsumed.add(link.target);
+            });
+
+            // Dominators are subsumers that are not subsumed by anyone
+            subsumers.forEach(mutant => {
+                if (!subsumed.has(mutant)) {
+                    dominatorMutants.add(mutant);
+                }
+            });
+
+            // Also include mutants that are not involved in any subsumption relationship
+            dmsgGraph.nodes.forEach(node => {
+                if (!subsumers.has(node.id) && !subsumed.has(node.id)) {
+                    dominatorMutants.add(node.id);
+                }
+            });
+
+            // Display results
+            const dominatorList = Array.from(dominatorMutants).sort((a, b) => a - b);
+            
+            document.getElementById('dominators').innerHTML = `
+                <div class="dominator-list">
+                    <h3>👑 Dominator Mutants</h3>
+                    <p><strong>Found ${dominatorList.length} dominator mutants:</strong></p>
+                    <div style="margin: 20px 0;">
+                        ${dominatorList.map(mutant => `<span class="mutant-item">M${mutant}</span>`).join('')}
+                    </div>
+                    
+                    <h4>Analysis Summary:</h4>
+                    <p>• <strong>Dominator mutants</strong> are those that subsume other mutants but are not subsumed themselves</p>
+                    <p>• These mutants represent the "strongest" or most comprehensive test requirements</p>
+                    <p>• Tests that kill dominator mutants are likely to kill many other mutants as well</p>
+                    
+                    <h4>Detailed Dominator Information:</h4>
+                    <pre>${generateDominatorDetails(dominatorList)}</pre>
+                </div>
+            `;
+
+            // Update results section
+            document.getElementById('results').innerHTML = `
+                <div class="results">
+                    <h3>✅ Dominator Analysis Complete</h3>
+                    <p><strong>Dominator mutants identified successfully!</strong></p>
+                    <p>• Total dominators found: ${dominatorList.length}</p>
+                    <p>• These mutants are at the "top" of the subsumption hierarchy</p>
+                    <p>• Focusing test efforts on killing these mutants may be most effective</p>
+                    
+                    <h4>Key Insights:</h4>
+                    <p>• Dominator mutants: ${dominatorList.join(', ')}</p>
+                    <p>• Subsumption relations: ${dmsgGraph.links.length}</p>
+                    <p>• Graph density: ${(dmsgGraph.links.length / (dmsgGraph.nodes.length * (dmsgGraph.nodes.length - 1)) * 100).toFixed(2)}%</p>
+                </div>
+            `;
+        }
+
+        // Generate detailed information about dominator mutants
+        function generateDominatorDetails(dominators) {
+            let details = "Mutant | Tests that kill it | Mutants it subsumes\n";
+            details += "-------|------------------|--------------------\n";
+            
+            dominators.forEach(mutant => {
+                const tests = mutantTestMatrix.get(mutant) || new Set();
+                const subsumedMutants = dmsgGraph.links
+                    .filter(link => link.source === mutant)
+                    .map(link => link.target);
+                
+                details += `M${mutant.toString().padStart(3)} | ${Array.from(tests).sort((a,b) => a-b).join(', ').padEnd(16)} | ${subsumedMutants.map(m => `M${m}`).join(', ')}\n`;
+            });
+            
+            return details;
+        }
+
+        // Initialize the application
+        function init() {
+            console.log('Local DMSG Analyzer initialized');
+            document.getElementById('results').innerHTML = `
+                <div class="results">
+                    <h3>🚀 Welcome to Local DMSG Analyzer</h3>
+                    <p>This tool analyzes mutation testing data to build a Dynamic Mutant Subsumption Graph.</p>
+                    <p><strong>Instructions:</strong></p>
+                    <ol>
+                        <li>Upload your <code>covMap.csv</code> and <code>killed.csv</code> files using the upload buttons above</li>
+                        <li>Click "Analyze Mutant Data" to process the CSV files</li>
+                        <li>Click "Build DMSG" to construct the subsumption graph</li>
+                        <li>Click "Visualize Graph" to see the interactive visualization</li>
+                        <li>Click "Find Dominators" to identify dominator mutants</li>
+                    </ol>
+                    <p><em>Note: Files should be from your mutation_results directory.</em></p>
+                </div>
+            `;
+        }
+
+        // Run initialization when page loads
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

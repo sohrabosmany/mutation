@@ -22,7 +22,7 @@
             mutationAnalysis="true"
                timeoutOffset="100"
                 exportCovMap="true"
-               exportKillMap="false"
+               exportKillMap="true"
                         sort="sort_methods"
               mutantsLogFile="${dir.mut}/mutants.log"
                   covMapFile="${dir.mut}/covMap.csv"
